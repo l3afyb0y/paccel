@@ -1,4 +1,4 @@
-use crate::libmaccel::fixedptc::Fpt;
+use crate::libpaccel::fixedptc::Fpt;
 use paste::paste;
 
 /// Declare an enum for every parameter.
@@ -57,7 +57,8 @@ macro_rules! declare_params {
 
 
         #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-        #[derive(Debug, Default, PartialEq, Clone, Copy)]
+        #[derive(Debug, Default, PartialEq, Clone, Copy, serde::Serialize, serde::Deserialize)]
+        #[serde(rename_all = "kebab-case")]
         #[repr(u8)]
         pub enum AccelMode {
             #[default]
@@ -216,7 +217,7 @@ impl AccelMode {
 
 impl Param {
     /// The canonical name of the parameter, as defined by the kernel module,
-    /// and exactly what can be read from /sys/module/maccel/parameters
+    /// and exactly what can be read from /sys/module/paccel/parameters
     pub fn name(&self) -> &'static str {
         match self {
             Param::SensMult => "SENS_MULT",

@@ -1,4 +1,4 @@
-#include "../../../driver/accel_rs.h"
+#include "../../../driver/paccel_accel_rs.h"
 #include "../../../driver/fixedptc.h"
 
 char *fpt_to_str(fpt num);

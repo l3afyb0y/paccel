@@ -1,0 +1,10 @@
+[Unit]
+Description=Apply the saved paccel configuration
+ConditionPathExists=/dev/paccel
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/paccel load --if-present
+
+[Install]
+WantedBy=default.target

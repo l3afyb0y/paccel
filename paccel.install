@@ -1,0 +1,15 @@
+post_install() {
+  echo ''
+  echo ' paccel was installed but has not been loaded or enabled.'
+  echo ' Do not load paccel while maccel is loaded: both would transform input.'
+  echo ' Review the README cutover procedure before using modprobe.'
+  echo ''
+}
+
+post_upgrade() {
+  echo ''
+  echo ' paccel was upgraded. Reload it only during an intentional maintenance window.'
+  echo ''
+}
+
+# post_remove() { }

@@ -1,1 +1,0 @@
-ACTION=="add", SUBSYSTEM=="module", DEVPATH=="/module/maccel", RUN+="maccel_param_ownership_and_resets"

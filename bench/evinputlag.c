@@ -14,7 +14,7 @@ static __suseconds_t to_us(struct timeval time) {
 
 /**
  * NOTE: This benchmark depends on temporarily setting
- * maccel_filter from input_handler.h to inject ktime_t diff (in us)
+ * paccel_filter from input_handler.h to inject ktime_t diff (in us)
  * between when the original event was received and the modified event was
  * reported, as the value of the REL_Z REL_ABS event. So we can measure the
  * extra lag from the input_handler. Assuming REL_Z, REL_ABS are only produced

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use anyhow::Context;
-use maccel_core::persist::ParamStore;
+use paccel_core::persist::ParamStore;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::{prelude::*, widgets::*};
@@ -10,7 +10,7 @@ use tui_input::backend::crossterm::EventHandler;
 
 use crate::action::{Action, Actions, InputAction};
 use crate::component::TuiComponent;
-use maccel_core::{ContextRef, Param, Parameter};
+use paccel_core::{ContextRef, Param, Parameter};
 
 #[derive(Debug, PartialEq)]
 pub enum InputMode {

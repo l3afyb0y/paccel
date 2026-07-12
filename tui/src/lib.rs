@@ -1,4 +1,4 @@
-use maccel_core::inputspeed;
+use paccel_core::inputspeed;
 
 use event::EventHandler;
 use ratatui::{Terminal, prelude::CrosstermBackend};

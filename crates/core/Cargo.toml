@@ -1,5 +1,5 @@
 [package]
-name = "maccel-core"
+name = "paccel-core"
 version = "0.0.0"
 edition = "2024"
 
@@ -7,6 +7,9 @@ edition = "2024"
 anyhow.workspace = true
 clap = { workspace = true, optional = true }
 paste = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+libc = { workspace = true }
 
 [features]
 dbg = []

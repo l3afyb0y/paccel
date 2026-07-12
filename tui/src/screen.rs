@@ -3,7 +3,7 @@ use std::cell::Cell;
 use std::fmt::Debug;
 
 use crossterm::event;
-use maccel_core::persist::ParamStore;
+use paccel_core::persist::ParamStore;
 use ratatui::layout::Rect;
 use ratatui::{prelude::*, widgets::*};
 
@@ -12,7 +12,7 @@ use crate::component::TuiComponent;
 use crate::param_input::ParameterInput;
 use crate::utils::CyclingIdx;
 use crate::widgets::scrollbar::CustomScrollbar;
-use maccel_core::AccelMode;
+use paccel_core::AccelMode;
 
 use super::param_input::InputMode;
 
@@ -162,7 +162,7 @@ impl<PS: ParamStore + Debug> TuiComponent for Screen<PS> {
 
         frame.render_widget(
             Paragraph::new(Text::from(vec![Line::from(vec![
-                "maccel".blue(),
+                "paccel".blue(),
                 " (press 'q' to quit)".into(),
             ])])),
             root_layout[0],
@@ -301,7 +301,7 @@ impl<PS: ParamStore + Debug> TuiComponent for Screen<PS> {
 
 #[cfg(test)]
 mod test {
-    use maccel_core::{AccelMode, persist::ParamStore};
+    use paccel_core::{AccelMode, persist::ParamStore};
 
     use crossterm::event::KeyCode;
 

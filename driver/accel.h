@@ -29,6 +29,12 @@ struct accel_args {
   union __accel_args args;
 };
 
+struct accel_state {
+  fpt carry_x;
+  fpt carry_y;
+  fpt last_input_speed;
+};
+
 const fpt NORMALIZED_DPI = fpt_fromint(1000);
 
 /**
@@ -67,9 +73,8 @@ static inline struct vector sensitivity(fpt input_speed,
 const fpt DEG_TO_RAD_FACTOR = fpt_xdiv(FIXEDPT_PI, fpt_rconst(180));
 
 static inline void f_accelerate(int *x, int *y, fpt time_interval_ms,
-                                struct accel_args args) {
-  static fpt carry_x = 0;
-  static fpt carry_y = 0;
+                                struct accel_args args,
+                                struct accel_state *state) {
 
   fpt dx = fpt_fromint(*x);
   fpt dy = fpt_fromint(*y);
@@ -113,6 +118,7 @@ accel_routine:
   dy = fpt_mul(dy, dpi_factor);
 
   fpt speed_in = input_speed(dx, dy, time_interval_ms);
+  state->last_input_speed = speed_in;
   struct vector sens = sensitivity(speed_in, args);
   dbg("scale x                    %s", fptoa(sens.x));
   dbg("scale y                    %s", fptoa(sens.y));
@@ -120,8 +126,8 @@ accel_routine:
   fpt dx_out = fpt_mul(dx, sens.x);
   fpt dy_out = fpt_mul(dy, sens.y);
 
-  dx_out = fpt_add(dx_out, carry_x);
-  dy_out = fpt_add(dy_out, carry_y);
+  dx_out = fpt_add(dx_out, state->carry_x);
+  dy_out = fpt_add(dy_out, state->carry_y);
 
   dbg("out: x                     %s", fptoa(dx_out));
   dbg("out: y                     %s", fptoa(dy_out));
@@ -131,10 +137,11 @@ accel_routine:
 
   dbg("out (int conversion)      (%d, %d)", *x, *y);
 
-  carry_x = fpt_sub(dx_out, fpt_fromint(*x));
-  carry_y = fpt_sub(dy_out, fpt_fromint(*y));
+  state->carry_x = fpt_sub(dx_out, fpt_fromint(*x));
+  state->carry_y = fpt_sub(dy_out, fpt_fromint(*y));
 
-  dbg("carry                     (%s, %s)", fptoa(carry_x), fptoa(carry_x));
+  dbg("carry                     (%s, %s)", fptoa(state->carry_x),
+      fptoa(state->carry_y));
 }
 
 #endif

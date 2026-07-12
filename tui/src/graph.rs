@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use maccel_core::{ContextRef, SensXY, get_param_value_from_ctx, persist::ParamStore, sensitivity};
+use paccel_core::{ContextRef, SensXY, get_param_value_from_ctx, persist::ParamStore, sensitivity};
 
 use crate::{action, component::TuiComponent};
 
@@ -74,7 +74,7 @@ impl<PS: ParamStore> SensitivityGraph<PS> {
         let params = self.context.get().params_snapshot();
         for x in (0..128).map(|x| (x as f64) * 1.0 /* step size */) {
             let (sens_x, sens_y) =
-                maccel_core::sensitivity(x, self.context.get().current_mode, &params);
+                paccel_core::sensitivity(x, self.context.get().current_mode, &params);
             self.data.push((x, sens_x));
             if sens_x != sens_y {
                 self.data_alt.push((x, sens_y));
@@ -83,7 +83,7 @@ impl<PS: ParamStore> SensitivityGraph<PS> {
     }
 
     fn read_input_speed_and_resolved_sens(&self) -> (f64, SensXY) {
-        let input_speed = maccel_core::inputspeed::read_input_speed();
+        let input_speed = paccel_core::inputspeed::read_input_speed();
         let params = self.context.get().params_snapshot();
         debug!("last mouse move read at {} counts/ms", input_speed);
         (

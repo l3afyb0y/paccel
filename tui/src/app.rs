@@ -1,15 +1,15 @@
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
-use maccel_core::ALL_COMMON_PARAMS;
-use maccel_core::ALL_LINEAR_PARAMS;
-use maccel_core::ALL_MODES;
-use maccel_core::ALL_NATURAL_PARAMS;
-use maccel_core::ALL_NOACCEL_PARAMS;
-use maccel_core::ALL_SYNCHRONOUS_PARAMS;
-use maccel_core::Param;
-use maccel_core::get_param_value_from_ctx;
-use maccel_core::persist::ParamStore;
-use maccel_core::persist::SysFsStore;
-use maccel_core::{ALL_PARAMS, AccelMode, ContextRef, TuiContext};
+use paccel_core::ALL_COMMON_PARAMS;
+use paccel_core::ALL_LINEAR_PARAMS;
+use paccel_core::ALL_MODES;
+use paccel_core::ALL_NATURAL_PARAMS;
+use paccel_core::ALL_NOACCEL_PARAMS;
+use paccel_core::ALL_SYNCHRONOUS_PARAMS;
+use paccel_core::Param;
+use paccel_core::get_param_value_from_ctx;
+use paccel_core::persist::DeviceStore;
+use paccel_core::persist::ParamStore;
+use paccel_core::{ALL_PARAMS, AccelMode, ContextRef, TuiContext};
 use ratatui::Terminal;
 use ratatui::backend::Backend;
 use ratatui::crossterm::event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEventKind};
@@ -26,8 +26,8 @@ use crate::screen::Screen;
 use crate::utils::CyclingIdx;
 
 pub struct App {
-    context: ContextRef<SysFsStore>,
-    screens: Vec<Screen<SysFsStore>>,
+    context: ContextRef<DeviceStore>,
+    screens: Vec<Screen<DeviceStore>>,
     screen_idx: CyclingIdx,
     pub(crate) is_running: bool,
 
@@ -36,8 +36,8 @@ pub struct App {
 
 pub fn collect_inputs_for_params(
     params: &[Param],
-    context: ContextRef<SysFsStore>,
-) -> Vec<ParameterInput<SysFsStore>> {
+    context: ContextRef<DeviceStore>,
+) -> Vec<ParameterInput<DeviceStore>> {
     ALL_COMMON_PARAMS
         .iter()
         .chain(params)
@@ -49,7 +49,8 @@ pub fn collect_inputs_for_params(
 impl App {
     pub fn new() -> Self {
         let context = ContextRef::new(
-            TuiContext::init(SysFsStore, ALL_PARAMS).expect("Failed to initialize the Tui Context"),
+            TuiContext::init(DeviceStore, ALL_PARAMS)
+                .expect("Failed to initialize the Tui Context"),
         );
 
         Self {
@@ -134,7 +135,7 @@ impl App {
         do_tick
     }
 
-    fn current_screen_mut(&mut self) -> &mut Screen<SysFsStore> {
+    fn current_screen_mut(&mut self) -> &mut Screen<DeviceStore> {
         let screen_idx = self.screen_idx.current();
         self.screens.get_mut(screen_idx).unwrap_or_else(|| {
             panic!(
@@ -144,7 +145,7 @@ impl App {
         })
     }
 
-    fn current_screen(&self) -> &Screen<SysFsStore> {
+    fn current_screen(&self) -> &Screen<DeviceStore> {
         let screen_idx = self.screen_idx.current();
         self.screens.get(screen_idx).unwrap_or_else(|| {
             panic!(
@@ -202,7 +203,7 @@ impl App {
         for action in actions.drain(..) {
             if let Action::SetMode(accel_mode) = action {
                 self.context.get_mut().current_mode = accel_mode;
-                SysFsStore
+                DeviceStore
                     .set_current_accel_mode(accel_mode)
                     .expect("Failed to set accel mode in TUI");
                 self.context.get_mut().reset_current_parameters();

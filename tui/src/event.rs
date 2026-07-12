@@ -1,5 +1,3 @@
-use std::sync::mpsc::TryRecvError;
-
 use crossterm::event::Event as CrosstermEvent;
 use crossterm::event::MouseEventKind;
 
@@ -43,10 +41,12 @@ impl EventHandler {
     }
 
     pub fn next(&self) -> anyhow::Result<Option<Event>> {
-        Ok(match self.rx.try_recv() {
-            Ok(e) => Some(e),
-            Err(TryRecvError::Empty) => None,
-            Err(err) => return Err(err.into()),
-        })
+        Ok(
+            match self.rx.recv_timeout(std::time::Duration::from_millis(16)) {
+                Ok(e) => Some(e),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => None,
+                Err(err) => return Err(err.into()),
+            },
+        )
     }
 }

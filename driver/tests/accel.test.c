@@ -9,6 +9,7 @@ static int test_acceleration(const char *filename, struct accel_args args) {
 
   char content[256 * 256 * LINE_LEN + 1];
   strcpy(content, ""); // initialize as an empty string
+  struct accel_state state = {0};
 
   for (int x = MIN; x < MAX; x++) {
     for (int y = MIN; y < MAX; y++) {
@@ -16,7 +17,7 @@ static int test_acceleration(const char *filename, struct accel_args args) {
       int x_out = x;
       int y_out = y;
 
-      f_accelerate(&x_out, &y_out, FIXEDPT_ONE, args);
+      f_accelerate(&x_out, &y_out, FIXEDPT_ONE, args, &state);
 
       char curr_debug_print[LINE_LEN];
 

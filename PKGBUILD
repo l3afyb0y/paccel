@@ -1,20 +1,22 @@
-pkgname=maccel-dkms
-_pkgname="maccel"
-pkgver=0.5.9
+pkgname=paccel
+_pkgname=paccel
+pkgver=0.1.0
 pkgrel=1
-pkgdesc="Mouse acceleration driver and kernel module for Linux."
+pkgdesc="Personal Linux mouse acceleration driver, CLI, and TUI"
 arch=("x86_64")
-url="https://www.maccel.org/"
+url="https://github.com/l3afyb0y/paccel"
 license=("GPL-2.0-or-later")
 
-install=maccel.install
+install=paccel.install
 depends=("dkms")
-makedepends=("git" "cargo")
+makedepends=("cargo" "git")
+conflicts=("maccel-dkms")
+provides=("paccel-dkms=${pkgver}")
 
 # DEBUG_CFLAGS="$DEBUG_CFLAGS -DDEBUG"
 options=(!debug !lto)
 
-source=("git+https://github.com/Gnarus-G/maccel.git")
+source=("paccel::git+https://github.com/l3afyb0y/paccel.git")
 sha256sums=("SKIP")
 
 prepare() {
@@ -22,7 +24,7 @@ prepare() {
 
   platform="$(rustc -vV | sed -n 's/host: //p')"
 
-  cargo fetch --locked --target "${platform}" --manifest-path="${srcdir}/maccel/Cargo.toml"
+  cargo fetch --locked --target "${platform}" --manifest-path="${srcdir}/paccel/Cargo.toml"
 }
 
 build() {
@@ -30,34 +32,33 @@ build() {
   export CARGO_TARGET_DIR=target
 
   # Build the CLI
-  cargo build --bin maccel --release --frozen --manifest-path="${srcdir}/maccel/Cargo.toml"
+  cargo build --bin paccel --release --frozen --manifest-path="${srcdir}/paccel/Cargo.toml"
 }
 
 package() {
   # Add group
-  install -Dm 644 "${srcdir}/maccel/maccel.sysusers" "${pkgdir}/usr/lib/sysusers.d/${_pkgname}.conf"
+  install -Dm 644 "${srcdir}/paccel/paccel.sysusers" "${pkgdir}/usr/lib/sysusers.d/${_pkgname}.conf"
 
   # Install Driver
-  install -Dm 644 "${srcdir}/maccel/dkms.conf" "${pkgdir}/usr/src/${_pkgname}-${pkgver}/dkms.conf"
+  install -Dm 644 "${srcdir}/paccel/dkms.conf" "${pkgdir}/usr/src/${_pkgname}-${pkgver}/dkms.conf"
 
   # Escape path separators from debug flags values
   DRIVER_CFLAGS=$(echo ${DEBUG_CFLAGS} | sed -e "s/\//\\\\\\//g")
 
-  # Set name and version
-  sed -e "s/@_PKGNAME@/${_pkgname}/" \
-    -e "s/@PKGVER@/${pkgver}/" \
+  # Set the package version and build flags for DKMS.
+  sed -e "s/@PKGVER@/${pkgver}/" \
     -e "s/@DRIVER_CFLAGS@/'${DRIVER_CFLAGS}'/" \
     -i "${pkgdir}/usr/src/${_pkgname}-${pkgver}/dkms.conf"
 
-  cp -r "${srcdir}/maccel/driver/." "${pkgdir}/usr/src/${_pkgname}-${pkgver}/"
+  cp -r "${srcdir}/paccel/driver/." "${pkgdir}/usr/src/${_pkgname}-${pkgver}/"
 
   # Install CLI
-  install -Dm 755 "${srcdir}/target/release/maccel" "${pkgdir}/usr/bin/maccel"
+  install -Dm 755 "${srcdir}/target/release/paccel" "${pkgdir}/usr/bin/paccel"
 
   # Install udev rules
-  install -Dm 644 "${srcdir}/maccel/udev_rules/99-maccel.rules" "${pkgdir}/usr/lib/udev/rules.d/99-maccel.rules"
-  install -Dm 755 "${srcdir}/maccel/udev_rules/maccel_param_ownership_and_resets" "${pkgdir}/usr/lib/udev/maccel_param_ownership_and_resets"
+  install -Dm 644 "${srcdir}/paccel/udev_rules/99-paccel.rules" "${pkgdir}/usr/lib/udev/rules.d/99-paccel.rules"
+  install -Dm 644 "${srcdir}/paccel/systemd/paccel-apply.service" "${pkgdir}/usr/lib/systemd/user/paccel-apply.service"
 
   # Install License
-  install -Dm 644 "${srcdir}/maccel/LICENSE" "${pkgdir}/usr/share/licenses/${_pkgname}/LICENSE"
+  install -Dm 644 "${srcdir}/paccel/LICENSE" "${pkgdir}/usr/share/licenses/${_pkgname}/LICENSE"
 }

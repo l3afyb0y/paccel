@@ -35,18 +35,18 @@ impl CyclingIdx {
 
 #[cfg(test)]
 pub(crate) mod test_utils {
-    use maccel_core::{ContextRef, Parameter, fixedptc::Fpt};
     use mocks::MockStore;
+    use paccel_core::{ContextRef, Parameter, fixedptc::Fpt};
 
     pub fn new_context() -> (ContextRef<MockStore>, Vec<Parameter>) {
         let params = [
-            (maccel_core::Param::SensMult, 1.0),
-            (maccel_core::Param::Accel, 1.0),
+            (paccel_core::Param::SensMult, 1.0),
+            (paccel_core::Param::Accel, 1.0),
         ];
 
         let params = params.map(|(p, v)| (p, Fpt::from(v)));
         let context = ContextRef::new(
-            maccel_core::TuiContext::init(
+            paccel_core::TuiContext::init(
                 MockStore {
                     list: params.to_vec(),
                 },
@@ -60,7 +60,7 @@ pub(crate) mod test_utils {
 
     mod mocks {
         use anyhow::Context;
-        use maccel_core::{AccelMode, Param, fixedptc::Fpt, persist::ParamStore};
+        use paccel_core::{AccelMode, Param, fixedptc::Fpt, persist::ParamStore};
 
         #[derive(Debug)]
         pub struct MockStore {
@@ -86,11 +86,11 @@ pub(crate) mod test_utils {
 
             fn set_current_accel_mode(
                 &mut self,
-                _mode: maccel_core::AccelMode,
+                _mode: paccel_core::AccelMode,
             ) -> anyhow::Result<()> {
                 unimplemented!()
             }
-            fn get_current_accel_mode(&self) -> anyhow::Result<maccel_core::AccelMode> {
+            fn get_current_accel_mode(&self) -> anyhow::Result<paccel_core::AccelMode> {
                 Ok(AccelMode::Linear)
             }
         }

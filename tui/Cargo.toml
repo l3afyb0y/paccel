@@ -1,5 +1,5 @@
 [package]
-name = "maccel-tui"
+name = "paccel-tui"
 version = "0.0.0"
 edition = "2024"
 
@@ -9,4 +9,4 @@ crossterm = "0.28.1"
 tui-input = "*"
 anyhow = { workspace = true }
 tracing = { workspace = true }
-maccel-core = { workspace = true }
+paccel-core = { workspace = true }

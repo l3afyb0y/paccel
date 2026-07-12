@@ -6,7 +6,7 @@ pub mod fixedptc {
 
     use anyhow::Context;
 
-    use super::c_libmaccel::{self, str_to_fpt};
+    use super::c_libpaccel::{self, str_to_fpt};
 
     #[derive(Debug, Default, Clone, Copy, PartialEq)]
     #[repr(transparent)]
@@ -14,13 +14,13 @@ pub mod fixedptc {
 
     impl From<Fpt> for f64 {
         fn from(value: Fpt) -> Self {
-            unsafe { c_libmaccel::fpt_to_float(value) }
+            unsafe { c_libpaccel::fpt_to_float(value) }
         }
     }
 
     impl From<f64> for Fpt {
         fn from(value: f64) -> Self {
-            unsafe { c_libmaccel::fpt_from_float(value) }
+            unsafe { c_libpaccel::fpt_from_float(value) }
         }
     }
 
@@ -47,7 +47,7 @@ pub mod fixedptc {
 
         fn try_from(value: &'a Fpt) -> Result<Self, Self::Error> {
             unsafe {
-                let s = CStr::from_ptr(c_libmaccel::fpt_to_str(*value));
+                let s = CStr::from_ptr(c_libpaccel::fpt_to_str(*value));
                 let s = core::str::from_utf8(s.to_bytes())?;
                 Ok(s)
             }
@@ -71,7 +71,7 @@ pub struct Vector {
     pub y: i64,
 }
 
-mod c_libmaccel {
+mod c_libpaccel {
     use super::{Vector, fixedptc};
     use crate::params::AccelParams;
     use std::ffi::c_char;
@@ -88,4 +88,4 @@ mod c_libmaccel {
     }
 }
 
-pub use c_libmaccel::sensitivity_rs;
+pub use c_libpaccel::sensitivity_rs;

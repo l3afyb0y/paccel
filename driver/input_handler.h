@@ -1,167 +1,128 @@
-#include "./accel_k.h"
-#include "linux/input.h"
-#include "mouse_move.h"
+#ifndef __PACCEL_INPUT_HANDLER_H__
+#define __PACCEL_INPUT_HANDLER_H__
+
+#include "accel_k.h"
 #include <linux/hid.h>
+#include <linux/input.h>
+#include <linux/slab.h>
+#include <linux/string.h>
 #include <linux/version.h>
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0))
-#define __cleanup_events 0
-#else
-#define __cleanup_events 1
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 11, 0)
+#error "paccel requires Linux 6.11 or newer"
 #endif
 
-static inline bool rotation_is_enabled(void) {
-  /* Fast check: the default is "0", so skip atofp unless the string differs */
-  return PARAM_ANGLE_ROTATION[0] != '0' || PARAM_ANGLE_ROTATION[1] != '\0';
+struct paccel_device {
+  struct input_handle handle;
+  struct paccel_motion_state motion;
+  struct input_value *scratch;
+  unsigned int scratch_capacity;
+};
+
+static inline struct paccel_device *
+paccel_device_from_handle(struct input_handle *handle) {
+  return container_of(handle, struct paccel_device, handle);
 }
 
-/*
- * Collect the events EV_REL REL_X and EV_REL REL_Y, once we have both then
- * we accelerate the (x, y) vector and set the EV_REL event's value
- * through the `value_ptr` of each collected event.
- */
-static void event(struct input_handle *handle, struct input_value *value_ptr) {
-  /* printk(KERN_INFO "type %d, code %d, value %d", type, code, value); */
+static unsigned int
+paccel_transform_frame(struct paccel_device *device, struct input_value *values,
+                       unsigned int count, unsigned int frame_start,
+                       unsigned int syn_index) {
+  int x = 0;
+  int y = 0;
+  int first_x = -1;
+  int first_y = -1;
+  unsigned int index;
 
-  switch (value_ptr->type) {
-  case EV_REL: {
-    dbg("EV_REL => code %d, value %d", value_ptr->code, value_ptr->value);
-    update_mouse_move(value_ptr);
-    return;
-  }
-  case EV_SYN: {
-    int x = get_x(MOVEMENT);
-    int y = get_y(MOVEMENT);
-    if (x || y) {
-      dbg("EV_SYN => code %d", value_ptr->code);
-
-      /*
-       * When rotation is active and one axis is missing from this frame,
-       * point the missing axis to synthetic storage so f_accelerate can
-       * write the rotated cross-axis component into it. The synthetic
-       * value is later injected into the event stream by maccel_events().
-       *
-       * Only on >= 6.11.0: injection into the event buffer is not
-       * possible on older kernels, so there is no point in computing
-       * the cross-axis component.
-       */
-#if __cleanup_events
-      if (rotation_is_enabled()) {
-        ensure_axes_for_rotation();
-      }
-#endif
-
-      accelerate(&x, &y);
-      dbg("accelerated -> (%d, %d)", x, y);
-      set_x_move(x);
-      set_y_move(y);
-
-      clear_mouse_move();
-    }
-
-    return;
-  }
-  default:
-    return;
-  }
-}
-
-#if __cleanup_events
-static unsigned int maccel_events(struct input_handle *handle,
-                                  struct input_value *vals,
-                                  unsigned int count) {
-#else
-static void maccel_events(struct input_handle *handle,
-                          const struct input_value *vals, unsigned int count) {
-#endif
-  struct input_value *v;
-  for (v = vals; v != vals + count; v++) {
-    event(handle, v);
-  }
-
-  struct input_value *end = vals;
-
-  for (v = vals; v != vals + count; v++) {
-    if (v->type == EV_REL && v->value == NONE_EVENT_VALUE)
+  for (index = frame_start; index < syn_index; index++) {
+    struct input_value *value = &values[index];
+    if (value->type != EV_REL)
       continue;
-    if (end != v) {
-      *end = *v;
-    }
-    end++;
-  }
 
-  int _count = end - vals;
-
-#if __cleanup_events
-  /*
-   * Inject synthetic EV_REL events for axes that rotation produced
-   * but weren't present in the original frame. Insert before SYN_REPORT
-   * so downstream handlers see a valid event sequence.
-   *
-   * Gated to >= 6.11.0 only: on older kernels the handler returns void
-   * and cannot communicate a new event count to the input subsystem.
-   * Writing extra events into the buffer on those kernels is undefined
-   * behavior — the kernel won't deliver them and may behave erratically.
-   */
-  {
-    struct input_value *syn_pos = NULL;
-    unsigned int max = handle->dev->max_vals;
-
-    /* Find the last SYN_REPORT so we can insert before it */
-    for (v = vals; v != end; v++) {
-      if (v->type == EV_SYN && v->code == SYN_REPORT)
-        syn_pos = v;
-    }
-
-    if (injected_x && synthetic_x_val != NONE_EVENT_VALUE && _count < max) {
-      if (syn_pos) {
-        /* Shift SYN_REPORT and everything after it forward by one */
-        memmove(syn_pos + 1, syn_pos, (end - syn_pos) * sizeof(*syn_pos));
-        syn_pos->type = EV_REL;
-        syn_pos->code = REL_X;
-        syn_pos->value = synthetic_x_val;
-        syn_pos++;
-        end++;
-        _count++;
-      }
-      dbg("rotation: injected synthetic REL_X = %d", synthetic_x_val);
-    }
-
-    if (injected_y && synthetic_y_val != NONE_EVENT_VALUE && _count < max) {
-      if (syn_pos) {
-        memmove(syn_pos + 1, syn_pos, (end - syn_pos) * sizeof(*syn_pos));
-        syn_pos->type = EV_REL;
-        syn_pos->code = REL_Y;
-        syn_pos->value = synthetic_y_val;
-        end++;
-        _count++;
-      }
-      dbg("rotation: injected synthetic REL_Y = %d", synthetic_y_val);
+    if (value->code == REL_X) {
+      x += value->value;
+      if (first_x < 0)
+        first_x = index;
+      else
+        value->value = 0;
+    } else if (value->code == REL_Y) {
+      y += value->value;
+      if (first_y < 0)
+        first_y = index;
+      else
+        value->value = 0;
     }
   }
-#endif
 
-  handle->dev->num_vals = _count;
-#if __cleanup_events
-  return _count;
-#endif
+  if (!x && !y)
+    return count;
+
+  paccel_accelerate(&device->motion, &x, &y);
+
+  if (first_x >= 0) {
+    values[first_x].value = x;
+  } else if (x && count < device->scratch_capacity) {
+    memmove(&values[syn_index + 1], &values[syn_index],
+            (count - syn_index) * sizeof(*values));
+    values[syn_index] =
+        (struct input_value){.type = EV_REL, .code = REL_X, .value = x};
+    syn_index++;
+    count++;
+  }
+
+  if (first_y >= 0) {
+    values[first_y].value = y;
+  } else if (y && count < device->scratch_capacity) {
+    memmove(&values[syn_index + 1], &values[syn_index],
+            (count - syn_index) * sizeof(*values));
+    values[syn_index] =
+        (struct input_value){.type = EV_REL, .code = REL_Y, .value = y};
+    count++;
+  }
+
+  return count;
 }
 
-/* Same as Linux's input_register_handle but we always add the handle to the
- * head of handlers */
-static int input_register_handle_head(struct input_handle *handle) {
+static unsigned int paccel_events(struct input_handle *handle,
+                                  struct input_value *values,
+                                  unsigned int count) {
+  struct paccel_device *device = paccel_device_from_handle(handle);
+  unsigned int frame_start = 0;
+  unsigned int index = 0;
+
+  if (count > device->scratch_capacity)
+    return count;
+
+  memcpy(device->scratch, values, count * sizeof(*values));
+
+  while (index < count) {
+    struct input_value *value = &device->scratch[index];
+    if (value->type == EV_SYN && value->code == SYN_REPORT) {
+      unsigned int previous_count = count;
+      count = paccel_transform_frame(device, device->scratch, count,
+                                     frame_start, index);
+      index += count - previous_count;
+      frame_start = index + 1;
+    }
+    index++;
+  }
+
+  memcpy(values, device->scratch, count * sizeof(*values));
+  return count;
+}
+
+/* Register ahead of evdev so later handlers observe the transformed buffer. */
+static int paccel_register_handle_head(struct input_handle *handle) {
   struct input_handler *handler = handle->handler;
   struct input_dev *dev = handle->dev;
+  int error;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 11, 7))
-  /* In 6.11.7 an additional handler pointer was added:
-   * https://github.com/torvalds/linux/commit/071b24b54d2d05fbf39ddbb27dee08abd1d713f3
-   */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 11, 7)
   if (handler->events)
     handle->handle_events = handler->events;
 #endif
 
-  int error = mutex_lock_interruptible(&dev->mutex);
+  error = mutex_lock_interruptible(&dev->mutex);
   if (error)
     return error;
 
@@ -173,59 +134,83 @@ static int input_register_handle_head(struct input_handle *handle) {
   return 0;
 }
 
-static int maccel_connect(struct input_handler *handler, struct input_dev *dev,
+static bool paccel_match(struct input_handler *handler, struct input_dev *dev) {
+  bool has_axes = test_bit(REL_X, dev->relbit) && test_bit(REL_Y, dev->relbit);
+  bool is_pointer = test_bit(BTN_MOUSE, dev->keybit) ||
+                    test_bit(INPUT_PROP_POINTER, dev->propbit) ||
+                    test_bit(INPUT_PROP_DIRECT, dev->propbit);
+
+  return has_axes && is_pointer;
+}
+
+static int paccel_connect(struct input_handler *handler, struct input_dev *dev,
                           const struct input_device_id *id) {
-  struct input_handle *handle;
+  struct paccel_device *device;
   int error;
 
-  handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
-  if (!handle)
+  device = kzalloc(sizeof(*device), GFP_KERNEL);
+  if (!device)
     return -ENOMEM;
 
-  handle->dev = input_get_device(dev);
-  handle->handler = handler;
-  handle->name = "maccel";
+  device->scratch_capacity = dev->max_vals;
+  device->scratch =
+      kcalloc(device->scratch_capacity, sizeof(*device->scratch), GFP_KERNEL);
+  if (!device->scratch) {
+    error = -ENOMEM;
+    goto err_free_device;
+  }
 
-  error = input_register_handle_head(handle);
+  device->handle.dev = input_get_device(dev);
+  device->handle.handler = handler;
+  device->handle.name = "paccel";
+
+  error = paccel_register_handle_head(&device->handle);
   if (error)
-    goto err_free_mem;
+    goto err_put_input;
 
-  error = input_open_device(handle);
+  error = input_open_device(&device->handle);
   if (error)
     goto err_unregister_handle;
 
-  printk(KERN_INFO pr_fmt("maccel flags: DEBUG=%s; FIXEDPT_BITS=%d"),
-         DEBUG_TEST ? "true" : "false", FIXEDPT_BITS);
-
-  printk(KERN_INFO pr_fmt("maccel connecting to device: %s (%s at %s)"),
-         dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
-
+  pr_info("paccel connected to %s (%s at %s)\n", dev_name(&dev->dev),
+          dev->name ?: "unknown", dev->phys ?: "unknown");
   return 0;
 
 err_unregister_handle:
-  input_unregister_handle(handle);
-
-err_free_mem:
-  kfree(handle);
+  input_unregister_handle(&device->handle);
+err_put_input:
+  input_put_device(device->handle.dev);
+  kfree(device->scratch);
+err_free_device:
+  kfree(device);
   return error;
 }
 
-static void maccel_disconnect(struct input_handle *handle) {
+static void paccel_disconnect(struct input_handle *handle) {
+  struct paccel_device *device = paccel_device_from_handle(handle);
+
   input_close_device(handle);
   input_unregister_handle(handle);
-  kfree(handle);
+  input_put_device(handle->dev);
+  kfree(device->scratch);
+  kfree(device);
 }
 
-static const struct input_device_id my_ids[] = {
+static const struct input_device_id paccel_ids[] = {
     {.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
-     .evbit = {BIT_MASK(EV_REL)}}, // Match all relative pointer values
+     .evbit = {BIT_MASK(EV_REL)}},
     {},
 };
 
-MODULE_DEVICE_TABLE(input, my_ids);
+MODULE_DEVICE_TABLE(input, paccel_ids);
 
-struct input_handler maccel_handler = {.events = maccel_events,
-                                       .connect = maccel_connect,
-                                       .disconnect = maccel_disconnect,
-                                       .name = "maccel",
-                                       .id_table = my_ids};
+static struct input_handler paccel_handler = {
+    .events = paccel_events,
+    .match = paccel_match,
+    .connect = paccel_connect,
+    .disconnect = paccel_disconnect,
+    .name = "paccel",
+    .id_table = paccel_ids,
+};
+
+#endif

@@ -1,0 +1,1 @@
+ACTION=="add", KERNEL=="paccel", GROUP="paccel", MODE="0660"

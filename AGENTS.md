@@ -1,4 +1,4 @@
-# Agent Guidelines for maccel Repository
+# Agent Guidelines for paccel Repository
 
 This document outlines essential commands and style conventions for agentic coding in this repository.
 
@@ -23,7 +23,7 @@ This document outlines essential commands and style conventions for agentic codi
 - `make uninstall` - Remove module from kernel
 
 ### CLI (Rust)
-- `cargo build --bin maccel --release` - Build CLI binary
+- `cargo build --bin paccel --release` - Build CLI binary
 - `make dev_cli` - Run CLI with auto-reload using cargo-watch
 - `make install_cli` - Build and install CLI to /usr/local/bin
 - `make uninstall_cli` - Remove CLI binary
@@ -41,7 +41,7 @@ This document outlines essential commands and style conventions for agentic codi
 **Single Test:**
 - `TEST_NAME=<pattern> make test` - Filter C tests by filename
 - `cargo test <test_name>` - Run Rust test by name
-- `cargo test --package maccel-core <test_name>` - Run test in specific crate
+- `cargo test --package paccel-core <test_name>` - Run test in specific crate
 
 ### Linting & Formatting
 - `cargo fmt --all` - Format all Rust code
@@ -128,7 +128,7 @@ use crate::params::Param;
 
 **CLI version bump:**
 1. Update `cli/Cargo.toml` version
-2. `cargo update -p maccel-cli` - Update lock file
+2. `cargo update -p paccel-cli` - Update lock file
 3. `git add -A && git commit -m "Bump CLI version to x.y.z"`
 4. `git tag v<x.y.z> && git push origin v<x.y.z>`
 
@@ -154,7 +154,7 @@ at high DPI values.
 | CLI entry point | `cli/src/main.rs` |
 | Core library exports | `crates/core/src/lib.rs` |
 | Parameter definitions | `crates/core/src/params.rs` |
-| Driver entry point | `driver/maccel.c` |
+| Driver entry point | `driver/paccel.c` |
 | Test utilities | `driver/tests/test_utils.h` |
 
 ## 8. Dependencies

@@ -8,7 +8,7 @@ use anyhow::Context;
 
 use crate::{
     AccelMode,
-    libmaccel::fixedptc::Fpt,
+    libpaccel::fixedptc::Fpt,
     params::{AllParamArgs, Param},
     persist::ParamStore,
 };
@@ -110,7 +110,7 @@ impl<PS: ParamStore> TuiContext<PS> {
 #[macro_export]
 macro_rules! get_param_value_from_ctx {
     ($ctx:expr, $param_tag:tt) => {{
-        use maccel_core::Param;
+        use paccel_core::Param;
         let x = $ctx
             .get()
             .parameter(Param::$param_tag)
@@ -144,7 +144,7 @@ impl<PS: ParamStore> ContextRef<PS> {
         self.inner.borrow()
     }
 
-    pub fn get_mut(&mut self) -> RefMut<TuiContext<PS>> {
+    pub fn get_mut(&mut self) -> RefMut<'_, TuiContext<PS>> {
         self.inner.deref().borrow_mut()
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     AccelParams, AccelParamsByMode, LinearCurveParams, NaturalCurveParams, SynchronousCurveParams,
-    libmaccel::{self, fixedptc::Fpt},
+    libpaccel::{self, fixedptc::Fpt},
     params::AllParamArgs,
 };
 
@@ -45,7 +45,7 @@ pub type SensXY = (f64, f64);
 /// Ratio of Output speed to Input speed
 pub fn sensitivity(s_in: f64, mode: AccelMode, params: &AllParamArgs) -> SensXY {
     let sens =
-        unsafe { libmaccel::sensitivity_rs(s_in.into(), params.convert_to_accel_args(mode)) };
+        unsafe { libpaccel::sensitivity_rs(s_in.into(), params.convert_to_accel_args(mode)) };
     let ratio_x: f64 = Fpt(sens.x).into();
     let ratio_y: f64 = Fpt(sens.y).into();
 

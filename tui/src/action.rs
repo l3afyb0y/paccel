@@ -1,4 +1,4 @@
-use maccel_core::AccelMode;
+use paccel_core::AccelMode;
 
 #[derive(Debug, PartialEq)]
 pub enum InputAction {

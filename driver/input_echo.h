@@ -4,8 +4,16 @@
 #include "fixedptc.h"
 #include "linux/cdev.h"
 #include "linux/fs.h"
-#include "speed.h"
+#include "config_k.h"
+#include "telemetry_k.h"
 #include <linux/version.h>
+#include <linux/uaccess.h>
+
+#define PACCEL_IOCTL_MAGIC 'p'
+#define PACCEL_IOCTL_GET_CONFIG                                                \
+  _IOR(PACCEL_IOCTL_MAGIC, 1, struct paccel_config_v1)
+#define PACCEL_IOCTL_SET_CONFIG                                                \
+  _IOW(PACCEL_IOCTL_MAGIC, 2, struct paccel_config_v1)
 
 int create_char_device(void);
 void destroy_char_device(void);
@@ -38,49 +46,76 @@ static void fpt_to_int_be_bytes(fpt num, char bytes[sizeof(fpt)]) {
 
 static ssize_t read(struct file *f, char __user *user_buffer, size_t size,
                     loff_t *offset) {
-  dbg("echoing speed to userspace: %s", fptoa(LAST_INPUT_MOUSE_SPEED));
+  fpt speed = paccel_last_input_speed();
+  dbg("echoing speed to userspace: %s", fptoa(speed));
 
   char be_bytes_for_int[sizeof(fpt)] = {0};
-  fpt_to_int_be_bytes(LAST_INPUT_MOUSE_SPEED, be_bytes_for_int);
-
-  int err =
-      copy_to_user(user_buffer, be_bytes_for_int, sizeof(be_bytes_for_int));
-  if (err)
-    return -EFAULT;
-
-  return sizeof(be_bytes_for_int);
+  fpt_to_int_be_bytes(speed, be_bytes_for_int);
+  return simple_read_from_buffer(user_buffer, size, offset, be_bytes_for_int,
+                                 sizeof(be_bytes_for_int));
 }
 
-struct file_operations fops = {.owner = THIS_MODULE, .read = read};
+static long paccel_ioctl(struct file *file, unsigned int command,
+                         unsigned long argument) {
+  void __user *user = (void __user *)argument;
+  struct paccel_config_v1 config;
+
+  switch (command) {
+  case PACCEL_IOCTL_GET_CONFIG:
+    config = paccel_config_snapshot();
+    return copy_to_user(user, &config, sizeof(config)) ? -EFAULT : 0;
+  case PACCEL_IOCTL_SET_CONFIG:
+    if (copy_from_user(&config, user, sizeof(config)))
+      return -EFAULT;
+    return paccel_config_replace(&config);
+  default:
+    return -ENOTTY;
+  }
+}
+
+struct file_operations fops = {
+    .owner = THIS_MODULE,
+    .read = read,
+    .unlocked_ioctl = paccel_ioctl,
+    .llseek = noop_llseek,
+};
 
 int create_char_device(void) {
   int err;
-  err = alloc_chrdev_region(&device_number, 0, 1, "maccel");
+  err = alloc_chrdev_region(&device_number, 0, 1, "paccel");
   if (err)
     return -EIO;
 
   cdev_init(&device, &fops);
-  cdev_add(&device, device_number, 1);
+  err = cdev_add(&device, device_number, 1);
+  if (err)
+    goto err_free_region;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0))
-  device_class = class_create(THIS_MODULE, "maccel");
+  device_class = class_create(THIS_MODULE, "paccel");
 #else
   device.owner = THIS_MODULE;
-  device_class = class_create("maccel");
+  device_class = class_create("paccel");
 #endif
 
   if (IS_ERR(device_class)) {
     goto err_free_cdev;
   }
 
-  device_create(device_class, NULL, device_number, NULL, "maccel");
+  if (IS_ERR(device_create(device_class, NULL, device_number, NULL, "paccel"))) {
+    err = -ENODEV;
+    goto err_destroy_class;
+  }
 
   return 0;
 
+err_destroy_class:
+  class_destroy(device_class);
 err_free_cdev:
   cdev_del(&device);
+err_free_region:
   unregister_chrdev_region(device_number, 1);
-  return -EIO;
+  return err;
 }
 
 void destroy_char_device(void) {

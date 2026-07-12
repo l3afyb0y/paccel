@@ -7,11 +7,12 @@
  */
 static int __init driver_initialization(void) {
   int error;
+  paccel_config_store_init();
   error = create_char_device();
   if (error)
     return error;
 
-  error = input_register_handler(&maccel_handler);
+  error = input_register_handler(&paccel_handler);
   if (error)
     goto err_free_chrdev;
 
@@ -23,7 +24,7 @@ err_free_chrdev:
 }
 
 static void __exit driver_exit(void) {
-  input_unregister_handler(&maccel_handler);
+  input_unregister_handler(&paccel_handler);
   destroy_char_device();
 }
 

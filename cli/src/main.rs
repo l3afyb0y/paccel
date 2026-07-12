@@ -1,17 +1,19 @@
 use anyhow::Context;
 use clap::{CommandFactory, Parser};
-use maccel_core::{
+use paccel_core::{
     fixedptc::Fpt,
-    persist::{ParamStore, SysFsStore},
+    persist::{
+        config_path, import_maccel_config, load_config, save_config, DeviceStore, ParamStore,
+    },
     subcommads::*,
     AccelMode, NoAccelParamArgs, Param, ALL_COMMON_PARAMS, ALL_LINEAR_PARAMS, ALL_NATURAL_PARAMS,
     ALL_SYNCHRONOUS_PARAMS,
 };
-use maccel_tui::run_tui;
+use paccel_tui::run_tui;
 
 #[derive(Parser)]
 #[clap(author, about, version)]
-/// CLI to control the parameters for the maccel driver.
+/// CLI to control the parameters for the paccel driver.
 struct Cli {
     #[clap(subcommand)]
     command: Option<CLiCommands>,
@@ -23,12 +25,12 @@ enum CLiCommands {
     /// and see a graph of the sensitivity
     #[default]
     Tui,
-    /// Set the value for a parameter of the maccel driver
+    /// Set the value for a parameter of the paccel driver
     Set {
         #[clap(subcommand)]
         command: CliSubcommandSetParams,
     },
-    /// Get the values for parameters of the maccel driver
+    /// Get the values for parameters of the paccel driver
     Get {
         #[clap(subcommand)]
         command: CliSubcommandGetParams,
@@ -37,6 +39,25 @@ enum CLiCommands {
     Completion {
         // The shell for which to generate completions
         shell: clap_complete::Shell,
+    },
+    /// Save the driver's current configuration.
+    Save {
+        /// Replace an existing configuration file.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Validate and apply the saved configuration atomically.
+    Load {
+        /// Exit successfully when no saved configuration exists.
+        #[arg(long)]
+        if_present: bool,
+    },
+    /// Import the active legacy maccel settings into paccel's config file.
+    /// This never writes to or reloads maccel.
+    ImportMaccel {
+        /// Replace an existing paccel configuration file.
+        #[arg(long)]
+        force: bool,
     },
 
     #[cfg(debug_assertions)]
@@ -57,10 +78,10 @@ fn main() -> anyhow::Result<()> {
 
     // tracing_subscriber::fmt()
     //     .with_max_level(Level::DEBUG)
-    //     .with_writer(File::create("./maccel.log")?)
+    //     .with_writer(File::create("./paccel.log")?)
     //     .init();
 
-    let mut param_store = SysFsStore;
+    let mut param_store = DeviceStore;
 
     match args.command.unwrap_or_default() {
         CLiCommands::Set { command } => match command {
@@ -85,7 +106,7 @@ fn main() -> anyhow::Result<()> {
                     eprintln!();
                 }
             },
-            CliSubcommandSetParams::Mode { mode } => SysFsStore.set_current_accel_mode(mode)?,
+            CliSubcommandSetParams::Mode { mode } => param_store.set_current_accel_mode(mode)?,
         },
         CLiCommands::Get { command } => match command {
             CliSubcommandGetParams::Param { name } => {
@@ -119,7 +140,7 @@ fn main() -> anyhow::Result<()> {
                 }
             },
             CliSubcommandGetParams::Mode => {
-                let mode = SysFsStore.get_current_accel_mode()?;
+                let mode = param_store.get_current_accel_mode()?;
                 println!("{}\n", mode.as_title());
                 match mode {
                     AccelMode::Linear => {
@@ -143,7 +164,25 @@ fn main() -> anyhow::Result<()> {
         },
         CLiCommands::Tui => run_tui()?,
         CLiCommands::Completion { shell } => {
-            clap_complete::generate(shell, &mut Cli::command(), "maccel", &mut std::io::stdout())
+            clap_complete::generate(shell, &mut Cli::command(), "paccel", &mut std::io::stdout())
+        }
+        CLiCommands::Save { force } => {
+            let path = config_path()?;
+            save_config(&param_store.read_config()?, &path, force)?;
+            println!("Saved {}", path.display());
+        }
+        CLiCommands::Load { if_present } => {
+            let path = config_path()?;
+            if if_present && !path.exists() {
+                return Ok(());
+            }
+            param_store.write_config(&load_config(&path)?)?;
+            println!("Loaded {}", path.display());
+        }
+        CLiCommands::ImportMaccel { force } => {
+            let path = config_path()?;
+            save_config(&import_maccel_config()?, &path, force)?;
+            println!("Imported legacy settings into {}", path.display());
         }
         #[cfg(debug_assertions)]
         CLiCommands::Debug { command } => match command {
@@ -177,7 +216,7 @@ fn print_all_params<'p>(
 
     let params = params
         .map(|&p| {
-            SysFsStore.get(p).and_then(|_p: Fpt| {
+            DeviceStore.get(p).and_then(|_p: Fpt| {
                 let value: &str = (&_p).try_into()?;
                 Ok((p.display_name(), value.to_string()))
             })

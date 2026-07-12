@@ -1,5 +1,5 @@
 ifneq ($(KERNELRELEASE),)
-	obj-m      := maccel.o
+	obj-m      := paccel.o
 	ccflags-y += $(DRIVER_CFLAGS)
 endif
 

@@ -18,7 +18,7 @@ fn main() {
     };
     let mut compiler = cc::Build::new();
     compiler
-        .file("src/libmaccel.c")
+        .file("src/libpaccel.c")
         .define("FIXEDPT_BITS", fixedpt_bits);
 
     if cfg!(feature = "dbg") {
@@ -26,11 +26,11 @@ fn main() {
         compiler.debug(true);
     }
 
-    compiler.compile("maccel");
+    compiler.compile("paccel");
 
     println!("cargo:rust-link-search=static={}", out.display());
 
     const DRIVER_DIR: &str = "../../driver";
     println!("cargo:rerun-if-changed={DRIVER_DIR}");
-    println!("cargo:rerun-if-changed=src/libmaccel.c");
+    println!("cargo:rerun-if-changed=src/libpaccel.c");
 }
